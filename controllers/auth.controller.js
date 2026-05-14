@@ -1,5 +1,8 @@
 const jwt = require('jsonwebtoken');
 const User = require('../models/user.model');
+const Otp = require('../models/otp.model');
+const { sendMail } = require('../utils/mailer');
+const crypto = require('crypto');
 
 const generateToken = (user) => {
   return jwt.sign({ id: user._id, role: user.role }, process.env.JWT_SECRET, {
@@ -128,6 +131,76 @@ exports.logout = async (req, res, next) => {
     }
 
     res.json({ message: 'Logged out' });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// Send OTP to email or phone (email implemented via nodemailer)
+exports.sendOtp = async (req, res, next) => {
+  try {
+    const { identifier, type } = req.body; // type: 'email' or 'phone'
+    if (!identifier || !type) return res.status(400).json({ message: 'identifier and type are required' });
+
+    const code = (Math.floor(100000 + Math.random() * 900000)).toString();
+    const expiresAt = new Date(Date.now() + (process.env.OTP_EXPIRES_MINUTES ? Number(process.env.OTP_EXPIRES_MINUTES) * 60000 : 10 * 60000));
+
+    await Otp.findOneAndUpdate(
+      { identifier, type },
+      { code, expiresAt },
+      { upsert: true, new: true }
+    );
+
+    if (type === 'email') {
+      const subject = 'Your OTP Code';
+      const text = `Your OTP code is ${code}. It expires in 10 minutes.`;
+      await sendMail({ to: identifier, subject, text });
+    } else {
+      // Phone/SMS sending not implemented here — integrate your SMS provider.
+      console.warn('OTP created for phone; no SMS provider configured. Code:', code);
+    }
+
+    res.json({ message: 'OTP sent' });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// Verify OTP and issue tokens (creates user if not exists)
+exports.verifyOtp = async (req, res, next) => {
+  try {
+    const { identifier, type, code, name, role } = req.body;
+    if (!identifier || !type || !code) return res.status(400).json({ message: 'identifier, type and code are required' });
+
+    const otp = await Otp.findOne({ identifier, type, code });
+    if (!otp) return res.status(400).json({ message: 'Invalid OTP' });
+    if (otp.expiresAt < new Date()) return res.status(400).json({ message: 'OTP expired' });
+
+    // remove used otp
+    await Otp.deleteOne({ _id: otp._id });
+
+    // find or create user
+    const query = type === 'email' ? { email: identifier } : { phone: identifier };
+    let user = await User.findOne(query);
+    if (!user) {
+      const randomPassword = crypto.randomBytes(16).toString('hex');
+      user = await User.create({ name: name || 'User', password: randomPassword, role: role || 'staff', ...query });
+      // save refresh token
+      const refreshToken = generateRefreshToken(user);
+      user.refreshTokens = user.refreshTokens || [];
+      user.refreshTokens.push(refreshToken);
+      await user.save();
+      user.password = undefined;
+      return res.json({ user, token: generateToken(user), refreshToken });
+    }
+
+    // existing user — issue tokens
+    const refreshToken = generateRefreshToken(user);
+    user.refreshTokens = user.refreshTokens || [];
+    user.refreshTokens.push(refreshToken);
+    await user.save();
+    user.password = undefined;
+    res.json({ user, token: generateToken(user), refreshToken });
   } catch (err) {
     next(err);
   }
