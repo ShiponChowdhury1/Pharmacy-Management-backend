@@ -2,6 +2,8 @@ const mongoose = require('mongoose');
 
 const medicineSchema = new mongoose.Schema({
   name: { type: String, required: true, index: true },
+  genericName: { type: String },
+  category: { type: String, default: 'General' },
   brand: { type: String },
   batchNumber: { type: String },
   price: { type: Number, required: true },
