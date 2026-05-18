@@ -73,7 +73,7 @@ exports.register = async (req, res, next) => {
     // Send OTP email
     await sendMail({
       to: email,
-      subject: '🔐 Registration OTP – Pharmacy Management',
+      subject: 'Registration OTP – Pharmacy Management',
       text: `Hello ${fullName},\n\nYour registration OTP is: ${code}\nIt will expire in 10 minutes.\n\nIf you did not request this, please ignore this email.`,
       html: `
         <div style="font-family:Arial,sans-serif;max-width:480px;margin:auto;border:1px solid #e0e0e0;border-radius:8px;overflow:hidden">
@@ -185,7 +185,7 @@ exports.resendOtp = async (req, res, next) => {
 
     await sendMail({
       to: email,
-      subject: '🔐 Resend OTP – Pharmacy Management',
+      subject: 'Resend OTP – Pharmacy Management',
       text: `Your new OTP is: ${code}. It expires in 10 minutes.`,
       html: `
         <div style="font-family:Arial,sans-serif;max-width:480px;margin:auto;border:1px solid #e0e0e0;border-radius:8px;overflow:hidden">
@@ -316,7 +316,7 @@ exports.forgotPassword = async (req, res, next) => {
 
     await sendMail({
       to: email,
-      subject: '🔑 Password Reset OTP – Pharmacy Management',
+      subject: 'Password Reset OTP – Pharmacy Management',
       text: `Your password reset OTP is: ${code}. It expires in 10 minutes.`,
       html: `
         <div style="font-family:Arial,sans-serif;max-width:480px;margin:auto;border:1px solid #e0e0e0;border-radius:8px;overflow:hidden">
